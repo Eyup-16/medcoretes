@@ -1,25 +1,19 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   RefreshCw,
-  AlertCircle,
-  Calendar,
-  TrendingUp,
-  Users,
-  BookOpen
+  AlertCircle
 } from 'lucide-react';
 import { useAdminDashboard } from '@/hooks/use-admin-dashboard';
-import { StatsCards, DetailedStatsCards } from '@/components/admin/dashboard/stats-cards';
+import { StatsCards } from '@/components/admin/dashboard/stats-cards';
 
 /**
  * Admin Dashboard Overview Page
  *
- * Main dashboard page showing key metrics, analytics, and system overview
- * for admin users. Uses real API data with no mock data.
+ * Simplified dashboard showing only key metrics for admin users.
+ * Displays essential statistics: users, content, activity, and revenue.
  */
 export default function AdminDashboardPage() {
   const {
@@ -28,7 +22,6 @@ export default function AdminDashboardPage() {
     error,
     lastUpdated,
     refresh,
-    hasData,
     hasError,
     isRefreshing
   } = useAdminDashboard();
@@ -40,7 +33,7 @@ export default function AdminDashboardPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground">
-            Overview of your platform&apos;s performance and key metrics
+            Essential metrics for your medical education platform
           </p>
         </div>
         <div className="flex items-center gap-4">
@@ -80,102 +73,8 @@ export default function AdminDashboardPage() {
         </Alert>
       )}
 
-      {/* Main Stats Cards */}
+      {/* Key Metrics Only */}
       <StatsCards stats={stats} loading={loading} error={error} />
-
-      {/* Detailed Stats Cards */}
-      {hasData && <DetailedStatsCards stats={stats} loading={loading} error={error} />}
-
-      {/* Quick Actions */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center text-base">
-              <Users className="w-4 h-4 mr-2" />
-              User Management
-            </CardTitle>
-            <CardDescription>
-              Manage users, subscriptions, and access controls
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <Button variant="outline" size="sm" className="justify-start w-full">
-                View All Users
-              </Button>
-              <Button variant="outline" size="sm" className="justify-start w-full">
-                Manage Subscriptions
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center text-base">
-              <BookOpen className="w-4 h-4 mr-2" />
-              Content Management
-            </CardTitle>
-            <CardDescription>
-              Manage quizzes, exams, and educational content
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <Button variant="outline" size="sm" className="justify-start w-full">
-                Import Questions
-              </Button>
-              <Button variant="outline" size="sm" className="justify-start w-full">
-                Manage Exams
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center text-base">
-              <TrendingUp className="w-4 h-4 mr-2" />
-              Analytics
-            </CardTitle>
-            <CardDescription>
-              View detailed analytics and reports
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <Button variant="outline" size="sm" className="justify-start w-full">
-                User Analytics
-              </Button>
-              <Button variant="outline" size="sm" className="justify-start w-full">
-                Performance Reports
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* System Status */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center text-base">
-            <Calendar className="w-4 h-4 mr-2" />
-            System Status
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Badge variant="default">System Online</Badge>
-              <Badge variant="secondary">API Connected</Badge>
-              {hasData && <Badge variant="outline">Data Current</Badge>}
-            </div>
-            <div className="text-sm text-muted-foreground">
-              All systems operational
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }

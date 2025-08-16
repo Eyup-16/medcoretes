@@ -878,6 +878,158 @@ export interface ReviewQuestionReportRequest {
   action: 'RESOLVED' | 'DISMISSED';
 }
 
+// Admin Activation Codes Management Types
+export interface ActivationCode {
+  id: number;
+  code: string;
+  description?: string;
+  durationMonths: number;
+  maxUses: number;
+  currentUses: number;
+  isActive: boolean;
+  expiresAt: string;
+  createdAt: string;
+  updatedAt: string;
+  createdBy?: number;
+  studyPacks: Array<{
+    studyPack: {
+      id: number;
+      name: string;
+      type?: 'YEAR' | 'COURSE' | 'SPECIALTY';
+      yearNumber?: string;
+    };
+  }>;
+  creator?: {
+    id: number;
+    fullName: string;
+    email: string;
+  };
+}
+
+export interface CreateActivationCodeRequest {
+  description?: string;
+  durationMonths: number;
+  maxUses: number;
+  expiresAt: string;
+  studyPackIds: number[];
+}
+
+export interface ActivationCodeFilters {
+  isActive?: boolean;
+  search?: string;
+  createdBy?: number;
+}
+
+// Admin Question Management Types
+export interface AdminQuestion {
+  id: number;
+  questionText: string;
+  explanation?: string;
+  questionType: 'SINGLE_CHOICE' | 'MULTIPLE_CHOICE';
+  courseId: number;
+  examId?: number;
+  universityId?: number;
+  yearLevel?: string;
+  examYear?: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  course?: {
+    id: number;
+    name: string;
+    module?: {
+      id: number;
+      name: string;
+      unite?: {
+        id: number;
+        name: string;
+        studyPack?: {
+          id: number;
+          name: string;
+        };
+      };
+    };
+  };
+  university?: {
+    id: number;
+    name: string;
+    country: string;
+  };
+  exam?: {
+    id: number;
+    title: string;
+  };
+  answers: AdminQuestionAnswer[];
+  questionImages?: Array<{
+    id: number;
+    imagePath: string;
+    altText?: string;
+  }>;
+  _count?: {
+    reports: number;
+    sessions: number;
+  };
+}
+
+export interface AdminQuestionAnswer {
+  id?: number;
+  answerText: string;
+  isCorrect: boolean;
+  explanation?: string;
+}
+
+export interface AdminQuestionFilters {
+  courseId?: number;
+  universityId?: number;
+  examId?: number;
+  questionType?: 'SINGLE_CHOICE' | 'MULTIPLE_CHOICE';
+  yearLevel?: string;
+  examYear?: number;
+  isActive?: boolean;
+  search?: string;
+}
+
+export interface CreateQuestionRequest {
+  questionText: string;
+  explanation?: string;
+  questionType: 'SINGLE_CHOICE' | 'MULTIPLE_CHOICE';
+  courseId: number;
+  examId?: number;
+  universityId?: number;
+  yearLevel?: string;
+  examYear?: number;
+  questionImages?: Array<{ imagePath: string; altText?: string }>;
+  answers: Array<{
+    answerText: string;
+    isCorrect: boolean;
+    explanation?: string;
+  }>;
+}
+
+export interface UpdateQuestionRequest {
+  questionText?: string;
+  explanation?: string;
+  questionType?: 'SINGLE_CHOICE' | 'MULTIPLE_CHOICE';
+  courseId?: number;
+  examId?: number;
+  universityId?: number;
+  yearLevel?: string;
+  examYear?: number;
+  questionImages?: Array<{ imagePath: string; altText?: string }>;
+  answers?: Array<{
+    id?: number;
+    answerText: string;
+    isCorrect: boolean;
+    explanation?: string;
+  }>;
+  isActive?: boolean;
+}
+
+export interface UpdateQuestionExplanationRequest {
+  explanation: string;
+  explanationImages?: File[];
+}
+
 // Admin File Upload Types
 export interface UploadedFile {
   filename: string;

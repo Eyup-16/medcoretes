@@ -36,6 +36,14 @@ import {
   AdminQuestionReport,
   AdminQuestionReportFilters,
   ReviewQuestionReportRequest,
+  ActivationCode,
+  CreateActivationCodeRequest,
+  ActivationCodeFilters,
+  AdminQuestion,
+  AdminQuestionFilters,
+  CreateQuestionRequest,
+  UpdateQuestionRequest,
+  UpdateQuestionExplanationRequest,
   ImageUploadResponse,
   PDFUploadResponse,
   StudyPackMediaUploadResponse,
@@ -86,14 +94,14 @@ export class AuthService {
    * Get universities list for settings
    */
   static async getUniversities(): Promise<ApiResponse<UniversitiesResponse>> {
-    return apiClient.get<UniversitiesResponse>('/Universities');
+    return apiClient.get<UniversitiesResponse>('/universities');
   }
 
   /**
    * Get specialties list for settings
    */
   static async getSpecialties(): Promise<ApiResponse<SpecialtiesResponse>> {
-    return apiClient.get<SpecialtiesResponse>('/Specialties');
+    return apiClient.get<SpecialtiesResponse>('/specialties');
   }
 
   /**
@@ -1356,28 +1364,44 @@ export class AdminService {
   static async getUsers(params: PaginationParams & {
     search?: string;
     role?: string;
-    universityId?: number;
+    universityId?: number; // deprecated in docs; kept for backward compatibility
+    university?: number;   // docs-compliant param name
     isActive?: boolean;
-  } = {}): Promise<ApiResponse<PaginatedResponse<ApiUser>>> {
+  } = {}): Promise<ApiResponse<{
+    users: ApiUser[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    };
+  }>> {
     const queryParams = new URLSearchParams();
 
     if (params.page) queryParams.append('page', params.page.toString());
     if (params.limit) queryParams.append('limit', params.limit.toString());
     if (params.search) queryParams.append('search', params.search);
     if (params.role) queryParams.append('role', params.role);
-    if (params.universityId) queryParams.append('universityId', params.universityId.toString());
+    if (params.university !== undefined) {
+      queryParams.append('university', params.university.toString());
+    } else if (params.universityId) {
+      // map old name to new docs param for compatibility
+      queryParams.append('university', params.universityId.toString());
+    }
     if (params.isActive !== undefined) queryParams.append('isActive', params.isActive.toString());
 
     const url = queryParams.toString() ? `/admin/users?${queryParams.toString()}` : '/admin/users';
-    return apiClient.get<PaginatedResponse<ApiUser>>(url);
+    return apiClient.get<{
+      users: ApiUser[];
+      pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        totalPages: number;
+      };
+    }>(url);
   }
 
-  /**
-   * Get user by ID
-   */
-  static async getUserById(userId: number): Promise<ApiResponse<ApiUser>> {
-    return apiClient.get<ApiUser>(`/admin/users/${userId}`);
-  }
 
   /**
    * Create new user
@@ -1402,34 +1426,13 @@ export class AdminService {
   }
 
   /**
-   * Deactivate user
+   * Deactivate user (docs-compliant: set isActive=false via PUT)
    */
-  static async deactivateUser(userId: number): Promise<ApiResponse<{ success: boolean }>> {
-    return apiClient.delete<{ success: boolean }>(`/admin/users/${userId}`);
+  static async deactivateUser(userId: number): Promise<ApiResponse<ApiUser>> {
+    return apiClient.put<ApiUser>(`/admin/users/${userId}`, { isActive: false });
   }
 
-  /**
-   * Get user analytics
-   */
-  static async getUserAnalytics(): Promise<ApiResponse<{
-    totalUsers: number;
-    activeUsers: number;
-    newUsersToday: number;
-    usersByRole: Record<string, number>;
-    usersByUniversity: Array<{ universityId: number; universityName: string; count: number }>;
-    userGrowthRate: number;
-    retentionRate: number;
-  }>> {
-    return apiClient.get<{
-      totalUsers: number;
-      activeUsers: number;
-      newUsersToday: number;
-      usersByRole: Record<string, number>;
-      usersByUniversity: Array<{ universityId: number; universityName: string; count: number }>;
-      userGrowthRate: number;
-      retentionRate: number;
-    }>('/admin/analytics/users');
-  }
+
 
   /**
    * Get dashboard statistics
@@ -1441,9 +1444,9 @@ export class AdminService {
   /**
    * Reset user password (Admin only)
    */
-  static async resetUserPassword(userId: number, newPassword?: string): Promise<ApiResponse<{ success: boolean; message: string }>> {
+  static async resetUserPassword(userId: number, newPassword: string): Promise<ApiResponse<{ success: boolean; message: string }>> {
     return apiClient.post<{ success: boolean; message: string }>(`/admin/users/${userId}/reset-password`, {
-      newPassword: newPassword || 'TempPassword123!' // Provide default for testing
+      newPassword
     });
   }
 
@@ -1560,18 +1563,140 @@ export class AdminService {
     return apiClient.post<AdminExam>('/admin/exams', examData);
   }
 
-  /**
-   * Update exam
-   */
-  static async updateExam(examId: number, updateData: UpdateExamRequest): Promise<ApiResponse<AdminExam>> {
-    return apiClient.put<AdminExam>(`/admin/exams/${examId}`, updateData);
-  }
 
   /**
    * Update exam question order
    */
   static async updateExamQuestionOrder(orderData: UpdateExamQuestionOrderRequest): Promise<ApiResponse<{ success: boolean; message: string }>> {
     return apiClient.put<{ success: boolean; message: string }>('/admin/exams/question-order', orderData);
+  }
+
+  // ==================== QUESTION MANAGEMENT ====================
+
+  /**
+   * Get all questions with pagination and filtering
+   */
+  static async getQuestions(params: PaginationParams & AdminQuestionFilters = {}): Promise<ApiResponse<PaginatedResponse<AdminQuestion>>> {
+    const queryParams = new URLSearchParams();
+
+    if (params.page) queryParams.append('page', params.page.toString());
+    if (params.limit) queryParams.append('limit', params.limit.toString());
+    if (params.courseId) queryParams.append('courseId', params.courseId.toString());
+    if (params.universityId) queryParams.append('universityId', params.universityId.toString());
+    if (params.examId) queryParams.append('examId', params.examId.toString());
+    if (params.questionType) queryParams.append('questionType', params.questionType);
+    if (params.yearLevel) queryParams.append('yearLevel', params.yearLevel);
+    if (params.examYear) queryParams.append('examYear', params.examYear.toString());
+    if (params.isActive !== undefined) queryParams.append('isActive', params.isActive.toString());
+    if (params.search) queryParams.append('search', params.search);
+
+    const url = queryParams.toString() ? `/admin/questions?${queryParams.toString()}` : '/admin/questions';
+    return apiClient.get<PaginatedResponse<AdminQuestion>>(url);
+  }
+
+  /**
+   * Get single question by ID
+   */
+  static async getQuestion(questionId: number): Promise<ApiResponse<AdminQuestion>> {
+    return apiClient.get<AdminQuestion>(`/admin/questions/${questionId}`);
+  }
+
+  /**
+   * Create new question
+   */
+  static async createQuestion(questionData: CreateQuestionRequest): Promise<ApiResponse<AdminQuestion>> {
+    return apiClient.post<AdminQuestion>('/admin/questions', questionData);
+  }
+
+  /**
+   * Create multiple questions in bulk
+   */
+  static async createQuestionsBulk(bulkData: {
+    metadata: {
+      courseId: number;
+      universityId?: number;
+      examYear?: number;
+    };
+    questions: Array<{
+      questionText: string;
+      explanation?: string;
+      questionType: 'SINGLE_CHOICE' | 'MULTIPLE_CHOICE';
+      answers: Array<{
+        answerText: string;
+        isCorrect: boolean;
+        explanation?: string;
+      }>;
+    }>;
+  }): Promise<ApiResponse<{
+    questions: Array<{
+      id: number;
+      questionText: string;
+      questionType: string;
+    }>;
+    totalCreated: number;
+  }>> {
+    return apiClient.post<{
+      questions: Array<{
+        id: number;
+        questionText: string;
+        questionType: string;
+      }>;
+      totalCreated: number;
+    }>('/admin/questions/bulk', bulkData);
+  }
+
+  /**
+   * Update question
+   * Note: PUT /admin/questions/{id} endpoint is not implemented on backend
+   * This method provides graceful error handling until the endpoint is available
+   */
+  static async updateQuestion(questionId: number, updateData: UpdateQuestionRequest): Promise<ApiResponse<AdminQuestion>> {
+    try {
+      return await apiClient.put<AdminQuestion>(`/admin/questions/${questionId}`, updateData);
+    } catch (error: any) {
+      // If the endpoint returns 404, provide a helpful error message
+      if (error?.response?.status === 404) {
+        throw new Error('Question update functionality is not yet implemented on the backend. Please use the explanation update feature or contact the development team.');
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Delete question
+   * Note: DELETE /admin/questions/{id} endpoint is not implemented on backend
+   * This method provides graceful error handling until the endpoint is available
+   */
+  static async deleteQuestion(questionId: number): Promise<ApiResponse<{ success: boolean; message: string }>> {
+    try {
+      return await apiClient.delete<{ success: boolean; message: string }>(`/admin/questions/${questionId}`);
+    } catch (error: any) {
+      // If the endpoint returns 404, provide a helpful error message
+      if (error?.response?.status === 404) {
+        throw new Error('Question deletion functionality is not yet implemented on the backend. Please contact the development team.');
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Update question explanation with images
+   */
+  static async updateQuestionExplanation(questionId: number, explanationData: UpdateQuestionExplanationRequest): Promise<ApiResponse<{ success: boolean; message: string; imageCount: number }>> {
+    const formData = new FormData();
+    formData.append('explanation', explanationData.explanation);
+
+    if (explanationData.explanationImages) {
+      explanationData.explanationImages.forEach(image => {
+        formData.append('explanationImages', image);
+      });
+    }
+
+    return apiClient.put<{ success: boolean; message: string; imageCount: number }>(`/admin/questions/${questionId}/explanation`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
   }
 
   // ==================== QUESTION REPORTS MANAGEMENT ====================
@@ -1590,7 +1715,8 @@ export class AdminService {
     if (params.userId) queryParams.append('userId', params.userId.toString());
     if (params.search) queryParams.append('search', params.search);
 
-    const url = queryParams.toString() ? `/admin/question-reports?${queryParams.toString()}` : '/admin/question-reports';
+    // Use the functional endpoint path: /admin/questions/reports instead of /admin/question-reports
+    const url = queryParams.toString() ? `/admin/questions/reports?${queryParams.toString()}` : '/admin/questions/reports';
     return apiClient.get<PaginatedResponse<AdminQuestionReport>>(url);
   }
 
@@ -1598,7 +1724,8 @@ export class AdminService {
    * Review question report
    */
   static async reviewQuestionReport(reportId: number, reviewData: ReviewQuestionReportRequest): Promise<ApiResponse<AdminQuestionReport>> {
-    return apiClient.put<AdminQuestionReport>(`/admin/question-reports/${reportId}/review`, reviewData);
+    // Use the correct working endpoint: PUT /admin/questions/reports/{id}
+    return apiClient.put<AdminQuestionReport>(`/admin/questions/reports/${reportId}`, reviewData);
   }
 
   // ==================== FILE UPLOAD MANAGEMENT ====================
@@ -1685,6 +1812,148 @@ export class AdminService {
       },
     });
   }
+
+  // ==================== QUESTION MANAGEMENT ====================
+
+  /**
+   * Get question filters for hierarchy selection
+   */
+  static async getQuestionFilters(): Promise<ApiResponse<{
+    filters: {
+      courses: Array<{
+        id: number;
+        moduleId: number;
+        name: string;
+        description: string;
+        createdAt: string;
+        updatedAt: string;
+        module: {
+          id: number;
+          uniteId: number;
+          name: string;
+          description: string;
+          createdAt: string;
+          updatedAt: string;
+          unite: {
+            id: number;
+            studyPackId: number;
+            name: string;
+            description: string;
+            logoUrl?: string;
+            createdAt: string;
+            updatedAt: string;
+          };
+        };
+      }>;
+      universities: Array<{
+        id: number;
+        name: string;
+        country: string;
+        createdAt: string;
+        updatedAt: string;
+      }>;
+      examYears: number[];
+      questionTypes: string[];
+    };
+  }>> {
+    return apiClient.get<{
+      filters: {
+        courses: Array<{
+          id: number;
+          moduleId: number;
+          name: string;
+          description: string;
+          createdAt: string;
+          updatedAt: string;
+          module: {
+            id: number;
+            uniteId: number;
+            name: string;
+            description: string;
+            createdAt: string;
+            updatedAt: string;
+            unite: {
+              id: number;
+              studyPackId: number;
+              name: string;
+              description: string;
+              logoUrl?: string;
+              createdAt: string;
+              updatedAt: string;
+            };
+          };
+        }>;
+        universities: Array<{
+          id: number;
+          name: string;
+          country: string;
+          createdAt: string;
+          updatedAt: string;
+        }>;
+        examYears: number[];
+        questionTypes: string[];
+      };
+    }>('/admin/questions/filters');
+  }
+
+  // ==================== ACTIVATION CODES MANAGEMENT ====================
+
+  /**
+   * Get all activation codes with pagination and filtering
+   */
+  static async getActivationCodes(params: PaginationParams & ActivationCodeFilters = {}): Promise<ApiResponse<{
+    activationCodes: ActivationCode[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    };
+  }>> {
+    const queryParams = new URLSearchParams();
+    if (params.page) queryParams.append('page', params.page.toString());
+    if (params.limit) queryParams.append('limit', params.limit.toString());
+    if (params.isActive !== undefined) queryParams.append('isActive', params.isActive.toString());
+    if (params.search) queryParams.append('search', params.search);
+    if (params.createdBy) queryParams.append('createdBy', params.createdBy.toString());
+
+    const url = queryParams.toString() ? `/admin/activation-codes?${queryParams.toString()}` : '/admin/activation-codes';
+    return apiClient.get<{
+      activationCodes: ActivationCode[];
+      pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        totalPages: number;
+      };
+    }>(url);
+  }
+
+  /**
+   * Create new activation code
+   */
+  static async createActivationCode(codeData: CreateActivationCodeRequest): Promise<ApiResponse<{
+    message: string;
+    activationCode: ActivationCode;
+  }>> {
+    return apiClient.post<{
+      message: string;
+      activationCode: ActivationCode;
+    }>('/admin/activation-codes', codeData);
+  }
+
+  /**
+   * Deactivate activation code
+   */
+  static async deactivateActivationCode(codeId: number): Promise<ApiResponse<{
+    message: string;
+    activationCode: ActivationCode;
+  }>> {
+    return apiClient.patch<{
+      message: string;
+      activationCode: ActivationCode;
+    }>(`/admin/activation-codes/${codeId}/deactivate`);
+  }
 }
 
 // Admin Content Management Services
@@ -1692,9 +1961,9 @@ export class AdminContentService {
   // ==================== STUDY PACK MANAGEMENT ====================
 
   /**
-   * Get all study packs for admin management
+   * Get all study packs for admin management (docs: supports pagination)
    */
-  static async getStudyPacks(): Promise<ApiResponse<{
+  static async getStudyPacks(params: { page?: number; limit?: number } = {}): Promise<ApiResponse<{
     studyPacks: Array<StudyPack & {
       unites: Array<StudyPackUnit & {
         modules: Array<StudyPackModule & {
@@ -1705,6 +1974,10 @@ export class AdminContentService {
       _count: { subscriptions: number };
     }>;
   }>> {
+    const queryParams = new URLSearchParams();
+    if (params.page) queryParams.append('page', params.page.toString());
+    if (params.limit) queryParams.append('limit', params.limit.toString());
+    const url = queryParams.toString() ? `/admin/study-packs?${queryParams.toString()}` : '/admin/study-packs';
     return apiClient.get<{
       studyPacks: Array<StudyPack & {
         unites: Array<StudyPackUnit & {
@@ -1715,29 +1988,9 @@ export class AdminContentService {
         subscriptions: any[];
         _count: { subscriptions: number };
       }>;
-    }>('/admin/study-packs');
+    }>(url);
   }
 
-  /**
-   * Get study pack by ID with full hierarchy
-   */
-  static async getStudyPackById(studyPackId: number): Promise<ApiResponse<StudyPack & {
-    unites: Array<StudyPackUnit & {
-      modules: Array<StudyPackModule & {
-        courses: Array<StudyPackCourse>;
-      }>;
-    }>;
-    _count: { subscriptions: number };
-  }>> {
-    return apiClient.get<StudyPack & {
-      unites: Array<StudyPackUnit & {
-        modules: Array<StudyPackModule & {
-          courses: Array<StudyPackCourse>;
-        }>;
-      }>;
-      _count: { subscriptions: number };
-    }>(`/admin/study-packs/${studyPackId}`);
-  }
 
   /**
    * Create new study pack
@@ -2043,13 +2296,14 @@ export class AdminContentService {
         updatedAt: string;
         course: { name: string };
       };
-    }>('/admin/content/course-resources', resourceData);
+    }>('/admin/content/resources', resourceData);
   }
 
   /**
    * Update resource
    */
   static async updateResource(resourceId: number, resourceData: Partial<{
+    courseId: number; // docs: allow moving resource to another course
     type: 'SLIDE' | 'VIDEO' | 'DOCUMENT' | 'LINK';
     title: string;
     description: string;
@@ -2093,7 +2347,7 @@ export class AdminContentService {
         updatedAt: string;
         course: { name: string };
       };
-    }>(`/admin/content/course-resources/${resourceId}`, resourceData);
+    }>(`/admin/content/resources/${resourceId}`, resourceData);
   }
 
   /**
@@ -2104,7 +2358,7 @@ export class AdminContentService {
   }>> {
     return apiClient.delete<{
       message: string;
-    }>(`/admin/content/course-resources/${resourceId}`);
+    }>(`/admin/content/resources/${resourceId}`);
   }
 
   // ==================== UNIVERSITY MANAGEMENT ====================
@@ -2171,6 +2425,42 @@ export class AdminContentService {
     }>(`/admin/universities/${universityId}`, universityData);
   }
 
+
+  // ==================== SPECIALTY MANAGEMENT (Admin) ====================
+
+  /**
+   * Create new specialty
+   */
+  static async createSpecialty(specialtyData: { name: string }): Promise<ApiResponse<{
+    message: string;
+    specialty: Specialty & { createdAt: string; updatedAt: string };
+  }>> {
+    return apiClient.post<{
+      message: string;
+      specialty: Specialty & { createdAt: string; updatedAt: string };
+    }>('/admin/specialties', specialtyData);
+  }
+
+  /**
+   * Update specialty
+   */
+  static async updateSpecialty(specialtyId: number, specialtyData: Partial<{ name: string }>): Promise<ApiResponse<{
+    message: string;
+    specialty: Specialty & { createdAt: string; updatedAt: string };
+  }>> {
+    return apiClient.put<{
+      message: string;
+      specialty: Specialty & { createdAt: string; updatedAt: string };
+    }>(`/admin/specialties/${specialtyId}`, specialtyData);
+  }
+
+  /**
+   * Delete specialty
+   */
+  static async deleteSpecialty(specialtyId: number): Promise<ApiResponse<{ message: string }>> {
+    return apiClient.delete<{ message: string }>(`/admin/specialties/${specialtyId}`);
+  }
+
   /**
    * Delete university
    */
@@ -2180,197 +2470,6 @@ export class AdminContentService {
     return apiClient.delete<{
       message: string;
     }>(`/admin/universities/${universityId}`);
-  }
-
-  // ==================== STUDY PACK MANAGEMENT ====================
-
-  /**
-   * Create new study pack
-   */
-  static async createStudyPack(studyPackData: {
-    name: string;
-    description: string;
-    type: 'YEAR' | 'RESIDENCY';
-    yearNumber?: 'ONE' | 'TWO' | 'THREE' | 'FOUR' | 'FIVE' | 'SIX' | 'SEVEN';
-    price: number;
-    isActive?: boolean;
-  }): Promise<ApiResponse<{
-    message: string;
-    studyPack: {
-      id: number;
-      name: string;
-      description: string;
-      type: string;
-      yearNumber: string | null;
-      price: number;
-      isActive: boolean;
-      createdAt: string;
-      updatedAt: string;
-    };
-  }>> {
-    return apiClient.post<{
-      message: string;
-      studyPack: {
-        id: number;
-        name: string;
-        description: string;
-        type: string;
-        yearNumber: string | null;
-        price: number;
-        isActive: boolean;
-        createdAt: string;
-        updatedAt: string;
-      };
-    }>('/admin/study-packs', studyPackData);
-  }
-
-  // ==================== QUESTION MANAGEMENT ====================
-
-  /**
-   * Get question filters for hierarchy selection
-   */
-  static async getQuestionFilters(): Promise<ApiResponse<{
-    filters: {
-      courses: Array<{
-        id: number;
-        moduleId: number;
-        name: string;
-        description: string;
-        createdAt: string;
-        updatedAt: string;
-        module: {
-          id: number;
-          uniteId: number;
-          name: string;
-          description: string;
-          createdAt: string;
-          updatedAt: string;
-          unite: {
-            id: number;
-            studyPackId: number;
-            name: string;
-            description: string;
-            logoUrl?: string;
-            createdAt: string;
-            updatedAt: string;
-          };
-        };
-      }>;
-      universities: Array<{
-        id: number;
-        name: string;
-        country: string;
-        createdAt: string;
-        updatedAt: string;
-      }>;
-      examYears: number[];
-      questionTypes: string[];
-    };
-  }>> {
-    return apiClient.get<{
-      filters: {
-        courses: Array<{
-          id: number;
-          moduleId: number;
-          name: string;
-          description: string;
-          createdAt: string;
-          updatedAt: string;
-          module: {
-            id: number;
-            uniteId: number;
-            name: string;
-            description: string;
-            createdAt: string;
-            updatedAt: string;
-            unite: {
-              id: number;
-              studyPackId: number;
-              name: string;
-              description: string;
-              logoUrl?: string;
-              createdAt: string;
-              updatedAt: string;
-            };
-          };
-        }>;
-        universities: Array<{
-          id: number;
-          name: string;
-          country: string;
-          createdAt: string;
-          updatedAt: string;
-        }>;
-        examYears: number[];
-        questionTypes: string[];
-      };
-    }>('/admin/questions/filters');
-  }
-
-  /**
-   * Create single question
-   */
-  static async createQuestion(questionData: {
-    questionText: string;
-    explanation?: string;
-    questionType: 'SINGLE_CHOICE' | 'MULTIPLE_CHOICE';
-    courseId: number;
-    universityId?: number;
-    yearLevel?: string;
-    examYear?: number;
-    answers: Array<{
-      answerText: string;
-      isCorrect: boolean;
-      explanation?: string;
-    }>;
-  }): Promise<ApiResponse<{
-    id: number;
-    questionText: string;
-    questionType: string;
-  }>> {
-    return apiClient.post<{
-      id: number;
-      questionText: string;
-      questionType: string;
-    }>('/admin/questions', questionData);
-  }
-
-  /**
-   * Bulk import questions
-   */
-  static async bulkImportQuestions(payload: {
-    metadata: {
-      courseId: number;
-      universityId?: number;
-      examYear?: number;
-      yearLevel?: string;
-    };
-    questions: Array<{
-      questionText: string;
-      explanation?: string;
-      questionType: 'SINGLE_CHOICE' | 'MULTIPLE_CHOICE';
-      answers: Array<{
-        answerText: string;
-        isCorrect: boolean;
-        explanation?: string;
-      }>;
-    }>;
-  }): Promise<ApiResponse<{
-    questions: Array<{
-      id: number;
-      questionText: string;
-      questionType: string;
-    }>;
-    totalCreated: number;
-  }>> {
-    return apiClient.post<{
-      questions: Array<{
-        id: number;
-        questionText: string;
-        questionType: string;
-      }>;
-      totalCreated: number;
-    }>('/admin/questions/bulk', payload);
   }
 }
 

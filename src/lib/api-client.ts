@@ -9,9 +9,14 @@ const API_CONFIG = {
   timeout: 30000, // 30 seconds
 };
 
-// Check if we need credentials (disable for ngrok)
-const isNgrokUrl = API_CONFIG.baseURL.includes('ngrok');
-const needsCredentials = !isNgrokUrl && !process.env.NEXT_PUBLIC_DISABLE_CREDENTIALS;
+// Check if credentials are needed (disabled for hosted/tunneled backends to avoid CORS issues)
+// When using external services like ngrok or hosted backends, withCredentials must be false
+// because they typically use wildcard CORS origins which conflict with credentials
+const isHostedBackend = API_CONFIG.baseURL.includes('hstgr.cloud') ||
+                       API_CONFIG.baseURL.includes('ngrok-free.app') ||
+                       API_CONFIG.baseURL.includes('ngrok.app') ||
+                       API_CONFIG.baseURL.includes('ngrok.io');
+const needsCredentials = !isHostedBackend && !process.env.NEXT_PUBLIC_DISABLE_CREDENTIALS;
 
 // API configuration is set up silently
 
@@ -40,15 +45,21 @@ class ApiClient {
   private tokenLoggedThisSession = false;
 
   constructor() {
+    // Prepare headers for the axios instance
+    const defaultHeaders: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    // Add ngrok-specific headers if using ngrok
+    if (API_CONFIG.baseURL.includes('ngrok')) {
+      defaultHeaders['ngrok-skip-browser-warning'] = 'true';
+    }
+
     this.client = axios.create({
       baseURL: API_CONFIG.baseURL,
       timeout: API_CONFIG.timeout,
-      withCredentials: needsCredentials, // Conditionally enable credentials
-      headers: {
-        'Content-Type': 'application/json',
-        // Required for ngrok to bypass browser warning
-        'ngrok-skip-browser-warning': 'true',
-      },
+      withCredentials: needsCredentials, // Disabled for hosted backend to avoid CORS issues
+      headers: defaultHeaders,
     });
 
     this.setupInterceptors();
@@ -270,6 +281,17 @@ class ApiClient {
       statusCode = error.response.status;
       const responseData = error.response.data as any;
 
+      // Log detailed info for 401 errors to help debug authentication issues
+      if (statusCode === 401) {
+        console.error('🔐 401 Unauthorized Error Details:', {
+          url: error.config?.url,
+          method: error.config?.method,
+          headers: error.config?.headers,
+          responseData: responseData,
+          responseHeaders: error.response.headers,
+        });
+      }
+
       // Handle different response data structures
       if (responseData?.error) {
         // Handle structured error object from API
@@ -315,23 +337,14 @@ class ApiClient {
         code: error.code,
         message: error.message,
         baseURL: API_CONFIG.baseURL,
-        isNgrok: isNgrokUrl,
         requestStatus: error.request?.status,
         requestReadyState: error.request?.readyState,
       });
 
       if (error.code === 'ECONNREFUSED' || error.code === 'ERR_NETWORK') {
-        if (isNgrokUrl) {
-          errorMessage = `Cannot connect to ngrok tunnel at ${API_CONFIG.baseURL}. Please check if ngrok is running and the tunnel is active.`;
-        } else {
-          errorMessage = `Cannot connect to API server at ${API_CONFIG.baseURL}. Please check if the backend server is running.`;
-        }
+        errorMessage = `Cannot connect to API server at ${API_CONFIG.baseURL}. Please check if the backend server is running.`;
       } else if (error.code === 'ENOTFOUND') {
-        if (isNgrokUrl) {
-          errorMessage = `Ngrok tunnel not found at ${API_CONFIG.baseURL}. Please check if the ngrok URL is correct and active.`;
-        } else {
-          errorMessage = `API server not found at ${API_CONFIG.baseURL}. Please check the API URL configuration.`;
-        }
+        errorMessage = `API server not found at ${API_CONFIG.baseURL}. Please check the API URL configuration.`;
       } else if (error.code === 'ECONNABORTED') {
         errorMessage = `Request timeout - the API server at ${API_CONFIG.baseURL} is taking too long to respond.`;
       } else {

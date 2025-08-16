@@ -9,13 +9,86 @@ The Medcin Platform is a comprehensive medical education system built with Node.
 ## Table of Contents
 
 1. [Authentication](#authentication)
-2. [Quiz System](#quiz-system)
-3. [Exam System](#exam-system)
-4. [Student Management](#student-management)
-5. [Admin & Content Management](#admin--content-management)
-6. [Media & File Upload](#media--file-upload)
-7. [Error Handling](#error-handling)
-8. [Response Formats](#response-formats)
+2. [Health Check](#health-check)
+3. [Public Content Access](#public-content-access)
+4. [Quiz System](#quiz-system)
+5. [Exam System](#exam-system)
+6. [Student Management](#student-management)
+7. [Admin & Content Management](#admin--content-management)
+8. [Media & File Upload](#media--file-upload)
+9. [Error Handling](#error-handling)
+10. [Response Formats](#response-formats)
+
+## Health Check
+
+### System Health Check
+```http
+GET /health
+```
+
+**Description:** Health check endpoint for Docker and monitoring systems.
+
+**Authentication:** None required
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "timestamp": "2024-01-15T10:30:00.000Z",
+  "service": "medcin-backend"
+}
+```
+
+## Public Content Access
+
+### Get Universities
+```http
+GET /universities
+```
+
+**Description:** Get list of all universities (public access).
+
+**Authentication:** None required
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "universities": [
+      {
+        "id": 1,
+        "name": "University of Algiers",
+        "country": "Algeria"
+      }
+    ]
+  }
+}
+```
+
+### Get Specialties
+```http
+GET /specialties
+```
+
+**Description:** Get list of all medical specialties (public access).
+
+**Authentication:** None required
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "specialties": [
+      {
+        "id": 1,
+        "name": "General Medicine"
+      }
+    ]
+  }
+}
+```
 
 ## Authentication
 
@@ -27,22 +100,42 @@ Authorization: Bearer <access_token>
 Content-Type: application/json
 ```
 
-### Token Management
+### Role-Based Access Control
+
+The API supports three user roles:
+- **STUDENT**: Access to learning content, quizzes, and personal progress
+- **EMPLOYEE**: Content creation and management capabilities
+- **ADMIN**: Full system administration access
+
+### Authentication Endpoints
 
 #### Register User
 ```http
 POST /auth/register
 Content-Type: application/json
+```
 
+**Request Body:**
+```json
 {
   "email": "student@example.com",
   "password": "password123",
   "fullName": "John Doe",
+  "phoneNumber": "+213123456789",
   "universityId": 1,
   "specialtyId": 1,
   "currentYear": "THREE"
 }
 ```
+
+**Validation Rules:**
+- `email`: Valid email format (required)
+- `password`: Minimum 4 characters (required)
+- `fullName`: Minimum 2 characters (required)
+- `phoneNumber`: Optional string
+- `universityId`: Optional positive integer
+- `specialtyId`: Optional positive integer
+- `currentYear`: Enum value (ONE, TWO, THREE, FOUR, FIVE, SIX, SEVEN), defaults to ONE
 
 **Response:**
 ```json
@@ -62,12 +155,19 @@ Content-Type: application/json
 ```http
 POST /auth/login
 Content-Type: application/json
+```
 
+**Request Body:**
+```json
 {
   "email": "student@example.com",
   "password": "password123"
 }
 ```
+
+**Validation Rules:**
+- `email`: Valid email format (required)
+- `password`: Non-empty string (required)
 
 **Response:**
 ```json
@@ -87,9 +187,108 @@ Content-Type: application/json
 ```http
 POST /auth/refresh
 Content-Type: application/json
+```
 
+**Request Body:**
+```json
 {
   "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Tokens refreshed successfully",
+  "data": {
+    "tokens": {
+      "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+      "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+    }
+  }
+}
+```
+
+#### Logout
+```http
+POST /auth/logout
+Authorization: Bearer <access_token>
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Logout successful"
+}
+```
+
+#### Verify Email
+```http
+POST /auth/verify-email
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+  "token": "email_verification_token_here"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Email verified successfully"
+}
+```
+
+#### Forgot Password
+```http
+POST /auth/forgot-password
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+  "email": "student@example.com"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Password reset email sent"
+}
+```
+
+#### Reset Password
+```http
+POST /auth/reset-password
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+  "token": "password_reset_token_here",
+  "newPassword": "newpassword123"
+}
+```
+
+**Validation Rules:**
+- `token`: Non-empty string (required)
+- `newPassword`: Minimum 4 characters (required)
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Password reset successful"
 }
 ```
 
@@ -97,6 +296,92 @@ Content-Type: application/json
 ```http
 GET /auth/profile
 Authorization: Bearer <access_token>
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "email": "student@example.com",
+    "fullName": "John Doe",
+    "role": "STUDENT",
+    "universityId": 1,
+    "specialtyId": 1,
+    "currentYear": "THREE",
+    "emailVerified": true,
+    "isActive": true,
+    "createdAt": "2024-01-15T10:30:00.000Z"
+  }
+}
+```
+
+#### Update Profile
+```http
+PUT /auth/profile
+Authorization: Bearer <access_token>
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+  "fullName": "John Smith",
+  "universityId": 2,
+  "specialtyId": 3,
+  "currentYear": "FOUR"
+}
+```
+
+**Validation Rules:**
+- `fullName`: Minimum 2 characters (optional)
+- `universityId`: Positive integer (optional)
+- `specialtyId`: Positive integer (optional)
+- `currentYear`: Enum value (optional)
+- At least one field must be provided
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Profile updated successfully",
+  "data": {
+    "id": 1,
+    "email": "student@example.com",
+    "fullName": "John Smith",
+    "universityId": 2,
+    "specialtyId": 3,
+    "currentYear": "FOUR"
+  }
+}
+```
+
+#### Change Password
+```http
+PUT /auth/change-password
+Authorization: Bearer <access_token>
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+  "currentPassword": "oldpassword123",
+  "newPassword": "newpassword123"
+}
+```
+
+**Validation Rules:**
+- `currentPassword`: Non-empty string (required)
+- `newPassword`: Minimum 4 characters (required)
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Password changed successfully"
+}
 ```
 
 **Response:**
@@ -249,20 +534,25 @@ The system supports three user roles:
 
 ## Quiz System
 
-The quiz system supports multiple question types including single choice (QCS) and multiple choice (QCM) questions.
+The quiz system supports multiple question types including single choice (QCS) and multiple choice (QCM) questions. All quiz endpoints require authentication and active subscription.
 
-### Create Quiz Session
+### Quiz Session Creation
 
-Create a dynamic quiz session with customizable filters and settings.
-
+#### Create Quiz Session
 ```http
 POST /quizzes/quiz-sessions
 Authorization: Bearer <access_token>
 Content-Type: application/json
+```
 
+**Description:** Create a dynamic quiz session with customizable filters and settings.
+
+**Authentication:** Required (Student role + active subscription)
+
+**Request Body:**
+```json
 {
   "title": "Anatomy Practice Quiz",
-  "type": "PRACTICE",
   "quizType": "QCM",
   "settings": {
     "questionCount": 20
@@ -271,10 +561,26 @@ Content-Type: application/json
     "yearLevels": ["THREE", "FOUR"],
     "uniteIds": [1, 2],
     "moduleIds": [5, 6],
-    "courseIds": [10, 11]
+    "courseIds": [10, 11],
+    "questionTypes": ["SINGLE_CHOICE", "MULTIPLE_CHOICE"],
+    "examYears": [2023, 2024],
+    "quizSourceIds": [1, 2]
   }
 }
 ```
+
+**Validation Rules:**
+- `title`: 3-100 characters, alphanumeric with basic punctuation (required)
+- `quizType`: Enum value (QCM, QCS) (optional)
+- `settings.questionCount`: 1-100 integer (required)
+- `filters.yearLevels`: Array of year levels, max 7 items (optional)
+- `filters.uniteIds`: Array of positive integers, max 10 items (optional)
+- `filters.moduleIds`: Array of positive integers, max 20 items (optional)
+- `filters.courseIds`: Array of positive integers, max 50 items (optional)
+- `filters.questionTypes`: Array of question types, max 2 items (optional)
+- `filters.examYears`: Array of years (1900-current+10), max 20 items (optional)
+- `filters.quizSourceIds`: Array of positive integers, max 10 items (optional)
+- At least one filter must be provided (if yearLevels not provided, user's current year is used)
 
 **Response:**
 ```json
@@ -284,10 +590,11 @@ Content-Type: application/json
     "session": {
       "id": 123,
       "title": "Anatomy Practice Quiz",
-      "type": "PRACTICE",
       "quizType": "QCM",
       "status": "NOT_STARTED",
-      "createdAt": "2024-01-01T10:00:00.000Z"
+      "questionCount": 20,
+      "createdAt": "2024-01-01T10:00:00.000Z",
+      "userId": 1
     },
     "questions": [
       {
@@ -323,14 +630,108 @@ Content-Type: application/json
 }
 ```
 
-### Get Quiz Session
+#### Get Quiz Filters
+```http
+GET /quizzes/quiz-filters
+Authorization: Bearer <access_token>
+```
 
-Retrieve details of a specific quiz session.
+**Description:** Get available filter options for quiz creation.
 
+**Authentication:** Required (Student role + active subscription)
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "yearLevels": ["ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX", "SEVEN"],
+    "unites": [
+      {
+        "id": 1,
+        "name": "Basic Sciences",
+        "modules": [
+          {
+            "id": 1,
+            "name": "Anatomy",
+            "courses": [
+              {
+                "id": 1,
+                "name": "Human Anatomy"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "questionTypes": ["SINGLE_CHOICE", "MULTIPLE_CHOICE"],
+    "quizSources": [
+      {
+        "id": 1,
+        "name": "University Exams"
+      }
+    ],
+    "availableYears": [2020, 2021, 2022, 2023, 2024]
+  }
+}
+```
+
+### Quiz Session Management
+
+#### Get User Quiz Sessions
+```http
+GET /quiz-sessions
+Authorization: Bearer <access_token>
+```
+
+**Description:** Get paginated list of user's quiz sessions.
+
+**Authentication:** Required (Student role + active subscription)
+
+**Query Parameters:**
+- `page`: Page number (1-1000, default: 1)
+- `limit`: Items per page (1-100, default: 10)
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "sessions": [
+      {
+        "id": 123,
+        "title": "Anatomy Practice Quiz",
+        "status": "COMPLETED",
+        "score": 18.5,
+        "percentage": 92.5,
+        "questionCount": 20,
+        "completedAt": "2024-01-01T11:00:00.000Z"
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "limit": 10,
+      "total": 25,
+      "totalPages": 3,
+      "hasNext": true,
+      "hasPrev": false
+    }
+  }
+}
+```
+
+#### Get Quiz Session Details
 ```http
 GET /quiz-sessions/{sessionId}
 Authorization: Bearer <access_token>
 ```
+
+**Description:** Retrieve detailed information about a specific quiz session.
+
+**Authentication:** Required (Student role + active subscription)
+
+**Path Parameters:**
+- `sessionId`: Positive integer (required)
 
 **Response:**
 ```json
@@ -339,16 +740,39 @@ Authorization: Bearer <access_token>
   "data": {
     "id": 123,
     "title": "Anatomy Practice Quiz",
-    "type": "PRACTICE",
     "status": "IN_PROGRESS",
     "score": 15.5,
     "percentage": 77.5,
+    "questionCount": 20,
     "startedAt": "2024-01-01T10:00:00.000Z",
     "questions": [
       {
         "id": 1,
         "questionText": "Which of the following are parts of the cardiovascular system?",
         "questionType": "MULTIPLE_CHOICE",
+        "explanation": "The cardiovascular system consists of the heart, blood vessels, and blood.",
+        "answers": [
+          {
+            "id": 1,
+            "answerText": "Heart",
+            "isCorrect": true
+          },
+          {
+            "id": 2,
+            "answerText": "Blood vessels",
+            "isCorrect": true
+          },
+          {
+            "id": 3,
+            "answerText": "Lungs",
+            "isCorrect": false
+          },
+          {
+            "id": 4,
+            "answerText": "Blood",
+            "isCorrect": true
+          }
+        ],
         "userAnswer": {
           "selectedAnswerIds": [1, 2, 4],
           "isCorrect": true,
@@ -360,15 +784,22 @@ Authorization: Bearer <access_token>
 }
 ```
 
-### Submit Answers
-
-Submit answers for quiz questions. Supports both single choice and multiple choice questions.
-
+#### Submit Quiz Answers
 ```http
 POST /quiz-sessions/{sessionId}/submit-answer
 Authorization: Bearer <access_token>
 Content-Type: application/json
+```
 
+**Description:** Submit answers for quiz questions. Supports both single choice and multiple choice questions.
+
+**Authentication:** Required (Student role + active subscription)
+
+**Path Parameters:**
+- `sessionId`: Positive integer (required)
+
+**Request Body:**
+```json
 {
   "answers": [
     {
@@ -382,6 +813,12 @@ Content-Type: application/json
   ]
 }
 ```
+
+**Validation Rules:**
+- `answers`: Array of 1-100 answer objects (required)
+- `answers[].questionId`: Positive integer (required)
+- `answers[].selectedAnswerId`: Positive integer (for single choice, mutually exclusive with selectedAnswerIds)
+- `answers[].selectedAnswerIds`: Array of positive integers, min 1 item (for multiple choice, mutually exclusive with selectedAnswerId)
 
 **Response:**
 ```json
@@ -411,29 +848,63 @@ Content-Type: application/json
 }
 ```
 
-### Update Single Answer
-
-Update a previously submitted answer.
-
+#### Update Single Answer
 ```http
 PUT /quiz-sessions/{sessionId}/questions/{questionId}/answer
 Authorization: Bearer <access_token>
 Content-Type: application/json
+```
 
+**Description:** Update a previously submitted answer for a specific question.
+
+**Authentication:** Required (Student role + active subscription)
+
+**Path Parameters:**
+- `sessionId`: Positive integer (required)
+- `questionId`: Positive integer (required)
+
+**Request Body:**
+```json
 {
   "selectedAnswerId": 3
 }
 ```
 
-### Create Retake Session
+**Validation Rules:**
+- `selectedAnswerId`: Positive integer (required)
 
-Create a retake session with different options.
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "questionId": 2,
+    "isCorrect": true,
+    "score": 1.0,
+    "explanation": "Correct! This is the right answer.",
+    "sessionUpdated": {
+      "score": 17.5,
+      "percentage": 87.5
+    }
+  }
+}
+```
 
+### Retake Sessions
+
+#### Create Retake Session
 ```http
 POST /quiz-sessions/retake
 Authorization: Bearer <access_token>
 Content-Type: application/json
+```
 
+**Description:** Create a retake session based on a previous quiz session with different filtering options.
+
+**Authentication:** Required (Student role + active subscription)
+
+**Request Body:**
+```json
 {
   "originalSessionId": 123,
   "retakeType": "INCORRECT_ONLY",
@@ -441,26 +912,57 @@ Content-Type: application/json
 }
 ```
 
-**Retake Types:**
-- `SAME`: Exact same questions
-- `INCORRECT_ONLY`: Only previously incorrect answers
-- `CORRECT_ONLY`: Only previously correct answers  
-- `NOT_RESPONDED`: Only skipped/unanswered questions
-
-### Get Quiz Filters
-
-Get available filter options for quiz creation.
-
-```http
-GET /quizzes/quiz-filters
-Authorization: Bearer <access_token>
-```
+**Validation Rules:**
+- `originalSessionId`: Positive integer (required)
+- `retakeType`: Enum value (required)
+  - `SAME`: Exact same questions
+  - `INCORRECT_ONLY`: Only previously incorrect answers
+  - `CORRECT_ONLY`: Only previously correct answers
+  - `NOT_RESPONDED`: Only skipped/unanswered questions
+- `title`: 3-100 characters, alphanumeric with basic punctuation (optional)
 
 **Response:**
 ```json
 {
   "success": true,
   "data": {
+    "session": {
+      "id": 124,
+      "title": "Anatomy Quiz - Incorrect Questions Only",
+      "originalSessionId": 123,
+      "retakeType": "INCORRECT_ONLY",
+      "status": "NOT_STARTED",
+      "questionCount": 5,
+      "createdAt": "2024-01-01T12:00:00.000Z"
+    },
+    "questions": [
+      {
+        "id": 2,
+        "questionText": "What is the largest organ in the human body?",
+        "questionType": "SINGLE_CHOICE",
+        "answers": [
+          {
+            "id": 5,
+            "answerText": "Liver"
+          },
+          {
+            "id": 6,
+            "answerText": "Skin"
+          },
+          {
+            "id": 7,
+            "answerText": "Brain"
+          },
+          {
+            "id": 8,
+            "answerText": "Heart"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
     "yearLevels": ["ONE", "TWO", "THREE", "FOUR", "FIVE"],
     "unites": [
       {
@@ -621,36 +1123,30 @@ The retake system provides flexible options for reviewing and improving performa
 
 ## Exam System
 
-The exam system provides structured exam sessions based on predefined exams and modules.
+The exam system provides structured exam sessions based on predefined exams and modules. All exam endpoints require authentication and active subscription.
 
-### Create Exam Session
+### Exam Session Creation
 
-Create an exam session from a specific exam.
-
+#### Create Exam Session
 ```http
 POST /exams/exam-sessions
 Authorization: Bearer <access_token>
 Content-Type: application/json
+```
 
+**Description:** Create an exam session from a specific predefined exam.
+
+**Authentication:** Required (Student role + active subscription)
+
+**Request Body:**
+```json
 {
   "examId": 16
 }
 ```
 
-### Create Exam Session from Multiple Modules
-
-Create an exam session combining questions from multiple modules.
-
-```http
-POST /exams/exam-sessions/from-modules
-Authorization: Bearer <access_token>
-Content-Type: application/json
-
-{
-  "moduleIds": [21, 22, 23],
-  "year": 2024
-}
-```
+**Validation Rules:**
+- `examId`: Positive integer (required)
 
 **Response:**
 ```json
@@ -659,9 +1155,12 @@ Content-Type: application/json
   "data": {
     "session": {
       "id": 456,
-      "title": "Combined Modules Exam - 2024",
+      "title": "Anatomy Final Exam 2024",
       "type": "EXAM",
       "status": "NOT_STARTED",
+      "examId": 16,
+      "questionCount": 50,
+      "timeLimit": 120,
       "createdAt": "2024-01-01T14:00:00.000Z"
     },
     "questions": [
@@ -669,7 +1168,269 @@ Content-Type: application/json
         "id": 10,
         "questionText": "What is the primary function of the respiratory system?",
         "questionType": "SINGLE_CHOICE",
+        "orderInExam": 1,
         "answers": [
+          {
+            "id": 40,
+            "answerText": "Gas exchange"
+          },
+          {
+            "id": 41,
+            "answerText": "Blood circulation"
+          },
+          {
+            "id": 42,
+            "answerText": "Digestion"
+          },
+          {
+            "id": 43,
+            "answerText": "Waste elimination"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+#### Create Exam Session from Multiple Modules
+```http
+POST /exams/exam-sessions/from-modules
+Authorization: Bearer <access_token>
+Content-Type: application/json
+```
+
+**Description:** Create an exam session combining questions from multiple modules for a specific year.
+
+**Authentication:** Required (Student role + active subscription)
+
+**Request Body:**
+```json
+{
+  "moduleIds": [21, 22, 23],
+  "year": 2024,
+  "title": "Combined Modules Practice Exam"
+}
+```
+
+**Validation Rules:**
+- `moduleIds`: Array of positive integers (required)
+- `year`: Integer (required)
+- `title`: String (optional)
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "session": {
+      "id": 457,
+      "title": "Combined Modules Practice Exam",
+      "type": "EXAM",
+      "status": "NOT_STARTED",
+      "moduleIds": [21, 22, 23],
+      "year": 2024,
+      "questionCount": 75,
+      "createdAt": "2024-01-01T14:00:00.000Z"
+    },
+    "questions": [
+      {
+        "id": 11,
+        "questionText": "Which hormone regulates blood sugar levels?",
+        "questionType": "SINGLE_CHOICE",
+        "moduleId": 21,
+        "answers": [
+          {
+            "id": 44,
+            "answerText": "Insulin"
+          },
+          {
+            "id": 45,
+            "answerText": "Adrenaline"
+          },
+          {
+            "id": 46,
+            "answerText": "Cortisol"
+          },
+          {
+            "id": 47,
+            "answerText": "Thyroxine"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+### Exam Discovery and Selection
+
+#### Get Available Exams
+```http
+GET /exams/available
+Authorization: Bearer <access_token>
+```
+
+**Description:** Get list of available exams for the authenticated user.
+
+**Authentication:** Required (Student role + active subscription)
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "exams": [
+      {
+        "id": 16,
+        "title": "Anatomy Final Exam 2024",
+        "description": "Comprehensive anatomy examination covering all major systems",
+        "moduleId": 5,
+        "moduleName": "Human Anatomy",
+        "universityId": 1,
+        "universityName": "University of Algiers",
+        "yearLevel": "THREE",
+        "examYear": "2024-01-15",
+        "year": 2024,
+        "questionCount": 50,
+        "timeLimit": 120,
+        "difficulty": "INTERMEDIATE"
+      }
+    ]
+  }
+}
+```
+
+#### Get Exams by Module and Year
+```http
+GET /exams/by-module/{moduleId}/{year}
+Authorization: Bearer <access_token>
+```
+
+**Description:** Get exams for a specific module and year.
+
+**Authentication:** Required (Student role + active subscription)
+
+**Path Parameters:**
+- `moduleId`: Positive integer (required)
+- `year`: Year (required)
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "exams": [
+      {
+        "id": 17,
+        "title": "Physiology Midterm 2024",
+        "moduleId": 6,
+        "year": 2024,
+        "questionCount": 30,
+        "timeLimit": 90
+      }
+    ]
+  }
+}
+```
+
+#### Get Exam Details
+```http
+GET /exams/{examId}
+Authorization: Bearer <access_token>
+```
+
+**Description:** Get detailed information about a specific exam.
+
+**Authentication:** Required (Student role + active subscription)
+
+**Path Parameters:**
+- `examId`: Positive integer (required)
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 16,
+    "title": "Anatomy Final Exam 2024",
+    "description": "Comprehensive anatomy examination covering all major systems",
+    "moduleId": 5,
+    "moduleName": "Human Anatomy",
+    "universityId": 1,
+    "universityName": "University of Algiers",
+    "yearLevel": "THREE",
+    "examYear": "2024-01-15",
+    "year": 2024,
+    "questionCount": 50,
+    "timeLimit": 120,
+    "difficulty": "INTERMEDIATE",
+    "topics": [
+      "Cardiovascular System",
+      "Respiratory System",
+      "Nervous System",
+      "Musculoskeletal System"
+    ],
+    "createdAt": "2024-01-01T00:00:00.000Z"
+  }
+}
+```
+
+#### Get Exam Questions
+```http
+GET /exams/{examId}/questions
+Authorization: Bearer <access_token>
+```
+
+**Description:** Get all questions for a specific exam (preview mode).
+
+**Authentication:** Required (Student role + active subscription)
+
+**Path Parameters:**
+- `examId`: Positive integer (required)
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "examId": 16,
+    "title": "Anatomy Final Exam 2024",
+    "questionCount": 50,
+    "questions": [
+      {
+        "id": 10,
+        "questionText": "What is the primary function of the respiratory system?",
+        "questionType": "SINGLE_CHOICE",
+        "orderInExam": 1,
+        "explanation": "The respiratory system's main function is gas exchange - taking in oxygen and removing carbon dioxide.",
+        "answers": [
+          {
+            "id": 40,
+            "answerText": "Gas exchange",
+            "isCorrect": true
+          },
+          {
+            "id": 41,
+            "answerText": "Blood circulation",
+            "isCorrect": false
+          },
+          {
+            "id": 42,
+            "answerText": "Digestion",
+            "isCorrect": false
+          },
+          {
+            "id": 43,
+            "answerText": "Waste elimination",
+            "isCorrect": false
+          }
+        ]
+      }
+    ]
+  }
+}
+```
           {
             "id": 40,
             "answerText": "Gas exchange"
@@ -868,16 +1629,19 @@ Create comprehensive exams by combining multiple modules:
 
 ## Student Management
 
-Student-specific endpoints for progress tracking, analytics, and personal management.
+Student-specific endpoints for progress tracking, analytics, and personal management. All student endpoints require authentication and student role.
 
-### Get Progress Overview
+### Progress and Analytics
 
-Get overall progress summary for the student.
-
+#### Get Progress Overview
 ```http
 GET /students/progress/overview
 Authorization: Bearer <access_token>
 ```
+
+**Description:** Get comprehensive progress summary for the authenticated student.
+
+**Authentication:** Required (Student role + active subscription)
 
 **Response:**
 ```json
@@ -888,60 +1652,225 @@ Authorization: Bearer <access_token>
     "completedSessions": 38,
     "averageScore": 78.5,
     "totalTimeSpent": "24h 30m",
+    "currentStreak": 7,
+    "longestStreak": 15,
     "recentActivity": [
       {
         "sessionId": 123,
         "title": "Anatomy Quiz",
+        "type": "PRACTICE",
         "score": 85,
+        "percentage": 85.0,
         "completedAt": "2024-01-01T10:00:00.000Z"
       }
     ],
     "progressBySubject": [
       {
-        "subject": "Anatomy",
-        "completedSessions": 15,
-        "averageScore": 82.3
+        "subjectName": "Anatomy",
+        "totalSessions": 15,
+        "averageScore": 82.3,
+        "improvement": 12.5
+      }
+    ],
+    "weeklyProgress": [
+      {
+        "week": "2024-W01",
+        "sessionsCompleted": 5,
+        "averageScore": 78.2,
+        "timeSpent": "3h 45m"
       }
     ]
   }
 }
 ```
 
-### Get Performance Analytics
-
-Get detailed performance analytics.
-
+#### Update Course Progress
 ```http
-GET /students/performance/analytics
+PUT /students/courses/{courseId}/progress
+Authorization: Bearer <access_token>
+Content-Type: application/json
+```
+
+**Description:** Update progress tracking for a specific course.
+
+**Authentication:** Required (Student role + active subscription)
+
+**Path Parameters:**
+- `courseId`: Positive integer (required)
+
+**Request Body:**
+```json
+{
+  "progressPercentage": 75.5,
+  "lastAccessedAt": "2024-01-01T10:00:00.000Z",
+  "notes": "Completed chapter 5"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "courseId": 1,
+    "progressPercentage": 75.5,
+    "lastAccessedAt": "2024-01-01T10:00:00.000Z",
+    "updatedAt": "2024-01-01T10:00:00.000Z"
+  }
+}
+```
+
+#### Get Quiz History
+```http
+GET /students/quiz-history
 Authorization: Bearer <access_token>
 ```
 
-### Get Student Dashboard
+**Description:** Get paginated history of completed quizzes and exams.
 
-Get comprehensive dashboard data.
+**Authentication:** Required (Student role + active subscription)
 
+**Query Parameters:**
+- `type`: Session type filter (PRACTICE, EXAM) (optional)
+- `page`: Page number (1-1000, default: 1)
+- `limit`: Items per page (1-50, default: 10)
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "sessions": [
+      {
+        "id": 123,
+        "title": "Anatomy Practice Quiz",
+        "type": "PRACTICE",
+        "status": "COMPLETED",
+        "score": 18.5,
+        "percentage": 92.5,
+        "questionCount": 20,
+        "timeSpent": "15m 30s",
+        "completedAt": "2024-01-01T10:00:00.000Z"
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "limit": 10,
+      "total": 45,
+      "totalPages": 5,
+      "hasNext": true,
+      "hasPrev": false
+    }
+  }
+}
+```
+
+#### Get Session Results with Filtering
 ```http
-GET /students/dashboard
+GET /students/session-results
 Authorization: Bearer <access_token>
 ```
 
-### Get Study Packs
+**Description:** Get detailed session results with advanced filtering options.
 
-Get available study packs for the student.
+**Authentication:** Required (Student role + active subscription)
 
+**Query Parameters:**
+- `answerType`: Filter by answer correctness (correct, incorrect, all) (default: all)
+- `sessionType`: Filter by session type (PRACTICE, EXAM) (optional)
+- `sessionIds`: Comma-separated list of session IDs (optional, max 50)
+- `examId`: Filter by specific exam ID (optional)
+- `quizId`: Filter by specific quiz ID (optional)
+- `completedAfter`: ISO datetime filter (optional)
+- `completedBefore`: ISO datetime filter (optional)
+- `page`: Page number (1-1000, default: 1)
+- `limit`: Items per page (1-100, default: 20)
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "results": [
+      {
+        "sessionId": 123,
+        "questionId": 1,
+        "questionText": "What is the largest organ in the human body?",
+        "userAnswer": "Skin",
+        "correctAnswer": "Skin",
+        "isCorrect": true,
+        "timeSpent": "30s",
+        "answeredAt": "2024-01-01T10:05:00.000Z"
+      }
+    ],
+    "summary": {
+      "totalQuestions": 100,
+      "correctAnswers": 85,
+      "incorrectAnswers": 15,
+      "accuracy": 85.0
+    },
+    "pagination": {
+      "page": 1,
+      "limit": 20,
+      "total": 100,
+      "totalPages": 5,
+      "hasNext": true,
+      "hasPrev": false
+    }
+  }
+}
+```
+
+#### Get Available Sessions
 ```http
-GET /students/study-packs
+GET /students/available-sessions
 Authorization: Bearer <access_token>
 ```
 
-### Get User Subscriptions
+**Description:** Get available quiz and exam sessions for the student.
 
-Get current subscriptions.
+**Authentication:** Required (Student role + active subscription)
 
+**Query Parameters:**
+- `sessionType`: Filter by session type (PRACTICE, EXAM) (optional)
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "availableSessions": [
+      {
+        "type": "PRACTICE",
+        "title": "Anatomy Practice",
+        "description": "Practice questions for anatomy",
+        "estimatedQuestions": 20,
+        "difficulty": "INTERMEDIATE"
+      },
+      {
+        "type": "EXAM",
+        "title": "Midterm Exam",
+        "description": "Comprehensive midterm examination",
+        "estimatedQuestions": 50,
+        "timeLimit": 120,
+        "difficulty": "ADVANCED"
+      }
+    ]
+  }
+}
+```
+
+### Subscription Management
+
+#### Get User Subscriptions
 ```http
 GET /students/subscriptions
 Authorization: Bearer <access_token>
 ```
+
+**Description:** Get current subscription information for the authenticated student.
+
+**Authentication:** Required (Student role)
 
 **Response:**
 ```json
@@ -951,11 +1880,872 @@ Authorization: Bearer <access_token>
     "subscriptions": [
       {
         "id": 1,
+        "studyPackId": 1,
+        "studyPackName": "Medical Year 3 Complete",
         "status": "ACTIVE",
         "startDate": "2024-01-01T00:00:00.000Z",
         "endDate": "2024-12-31T23:59:59.000Z",
+        "daysRemaining": 300,
         "amountPaid": 299.99,
         "paymentMethod": "credit_card",
+        "paymentReference": "PAY_123456789"
+      }
+    ],
+    "paymentStatus": "active",
+    "hasActiveSubscription": true
+  }
+}
+```
+
+### Notes Management
+
+#### Get Student Notes
+```http
+GET /students/notes
+Authorization: Bearer <access_token>
+```
+
+**Description:** Get student's personal notes with optional filtering.
+
+**Authentication:** Required (Student role)
+
+**Query Parameters:**
+- `questionId`: Filter by specific question ID (optional)
+- `quizId`: Filter by specific quiz ID (optional)
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "notes": [
+      {
+        "id": 1,
+        "noteText": "Remember: Heart has 4 chambers",
+        "questionId": 10,
+        "quizId": 5,
+        "createdAt": "2024-01-01T10:00:00.000Z",
+        "updatedAt": "2024-01-01T10:00:00.000Z"
+      }
+    ]
+  }
+}
+```
+
+#### Create Student Note
+```http
+POST /students/notes
+Authorization: Bearer <access_token>
+Content-Type: application/json
+```
+
+**Description:** Create a new personal note.
+
+**Authentication:** Required (Student role)
+
+**Request Body:**
+```json
+{
+  "noteText": "Important concept to review",
+  "questionId": 10,
+  "quizId": 5
+}
+```
+
+**Validation Rules:**
+- `noteText`: 1-2000 characters (required)
+- `questionId`: Positive integer (optional)
+- `quizId`: Positive integer (optional)
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "note": {
+      "id": 2,
+      "noteText": "Important concept to review",
+      "questionId": 10,
+      "quizId": 5,
+      "createdAt": "2024-01-01T10:00:00.000Z"
+    }
+  }
+}
+```
+
+#### Update Student Note
+```http
+PUT /students/notes/{id}
+Authorization: Bearer <access_token>
+Content-Type: application/json
+```
+
+**Description:** Update an existing note.
+
+**Authentication:** Required (Student role)
+
+**Path Parameters:**
+- `id`: Positive integer (required)
+
+**Request Body:**
+```json
+{
+  "noteText": "Updated note content"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "note": {
+      "id": 2,
+      "noteText": "Updated note content",
+      "updatedAt": "2024-01-01T11:00:00.000Z"
+    }
+  }
+}
+```
+
+#### Delete Student Note
+```http
+DELETE /students/notes/{id}
+Authorization: Bearer <access_token>
+```
+
+**Description:** Delete a note.
+
+**Authentication:** Required (Student role)
+
+**Path Parameters:**
+- `id`: Positive integer (required)
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Note deleted successfully"
+}
+```
+
+#### Get Notes for Question
+```http
+GET /students/questions/{id}/notes
+Authorization: Bearer <access_token>
+```
+
+**Description:** Get all notes associated with a specific question.
+
+**Authentication:** Required (Student role)
+
+**Path Parameters:**
+- `id`: Positive integer (required)
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "questionId": 10,
+    "notes": [
+      {
+        "id": 1,
+        "noteText": "Key concept for exam",
+        "createdAt": "2024-01-01T10:00:00.000Z"
+      }
+    ]
+  }
+}
+```
+
+### Labels Management
+
+#### Get Student Labels
+```http
+GET /students/labels
+Authorization: Bearer <access_token>
+```
+
+**Description:** Get all labels created by the student for organizing content.
+
+**Authentication:** Required (Student role)
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "labels": [
+      {
+        "id": 1,
+        "name": "Important",
+        "color": "#ff0000",
+        "createdAt": "2024-01-01T10:00:00.000Z"
+      },
+      {
+        "id": 2,
+        "name": "Review Later",
+        "color": "#00ff00",
+        "createdAt": "2024-01-01T10:00:00.000Z"
+      }
+    ]
+  }
+}
+```
+
+#### Create Student Label
+```http
+POST /students/labels
+Authorization: Bearer <access_token>
+Content-Type: application/json
+```
+
+**Description:** Create a new label for organizing content.
+
+**Authentication:** Required (Student role)
+
+**Request Body:**
+```json
+{
+  "name": "Difficult Topics"
+}
+```
+
+**Validation Rules:**
+- `name`: 1-50 characters, alphanumeric with spaces, hyphens, underscores (required)
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "label": {
+      "id": 3,
+      "name": "Difficult Topics",
+      "createdAt": "2024-01-01T10:00:00.000Z"
+    }
+  }
+}
+```
+
+#### Update Student Label
+```http
+PUT /students/labels/{id}
+Authorization: Bearer <access_token>
+Content-Type: application/json
+```
+
+**Description:** Update an existing label.
+
+**Authentication:** Required (Student role)
+
+**Path Parameters:**
+- `id`: Positive integer (required)
+
+**Request Body:**
+```json
+{
+  "name": "Updated Label Name"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "label": {
+      "id": 3,
+      "name": "Updated Label Name",
+      "updatedAt": "2024-01-01T11:00:00.000Z"
+    }
+  }
+}
+```
+
+#### Delete Student Label
+```http
+DELETE /students/labels/{id}
+Authorization: Bearer <access_token>
+```
+
+**Description:** Delete a label.
+
+**Authentication:** Required (Student role)
+
+**Path Parameters:**
+- `id`: Positive integer (required)
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Label deleted successfully"
+}
+```
+
+#### Add Label to Quiz
+```http
+POST /students/quizzes/{quizId}/labels/{labelId}
+Authorization: Bearer <access_token>
+```
+
+**Description:** Associate a label with a quiz.
+
+**Authentication:** Required (Student role)
+
+**Path Parameters:**
+- `quizId`: Positive integer (required)
+- `labelId`: Positive integer (required)
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Label added to quiz successfully"
+}
+```
+
+#### Add Label to Quiz Session
+```http
+POST /students/quiz-sessions/{quizSessionId}/labels/{labelId}
+Authorization: Bearer <access_token>
+```
+
+**Description:** Associate a label with a quiz session.
+
+**Authentication:** Required (Student role)
+
+**Path Parameters:**
+- `quizSessionId`: Positive integer (required)
+- `labelId`: Positive integer (required)
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Label added to quiz session successfully"
+}
+```
+
+### Todo Management
+
+#### Get Todos
+```http
+GET /students/todos
+Authorization: Bearer <access_token>
+```
+
+**Description:** Get student's todo items with filtering and pagination.
+
+**Authentication:** Required (Student role)
+
+**Query Parameters:**
+- `status`: Filter by status (PENDING, COMPLETED, CANCELLED) (optional)
+- `type`: Filter by type (STUDY, REVIEW, PRACTICE, OTHER) (optional)
+- `priority`: Filter by priority (LOW, MEDIUM, HIGH, URGENT) (optional)
+- `page`: Page number (1-1000, default: 1)
+- `limit`: Items per page (1-100, default: 20)
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "todos": [
+      {
+        "id": 1,
+        "title": "Review cardiovascular system",
+        "description": "Focus on heart anatomy and blood circulation",
+        "type": "REVIEW",
+        "priority": "HIGH",
+        "status": "PENDING",
+        "dueDate": "2024-01-15T00:00:00.000Z",
+        "courseId": 5,
+        "courseName": "Human Anatomy",
+        "createdAt": "2024-01-01T10:00:00.000Z"
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "limit": 20,
+      "total": 15,
+      "totalPages": 1,
+      "hasNext": false,
+      "hasPrev": false
+    }
+  }
+}
+```
+
+#### Create Todo
+```http
+POST /students/todos
+Authorization: Bearer <access_token>
+Content-Type: application/json
+```
+
+**Description:** Create a new todo item.
+
+**Authentication:** Required (Student role)
+
+**Request Body:**
+```json
+{
+  "title": "Study respiratory system",
+  "description": "Prepare for upcoming quiz",
+  "type": "STUDY",
+  "priority": "MEDIUM",
+  "dueDate": "2024-01-20T00:00:00.000Z",
+  "courseId": 6
+}
+```
+
+**Validation Rules:**
+- `title`: 1-100 characters (required)
+- `description`: Max 500 characters (optional)
+- `type`: Enum value (STUDY, REVIEW, PRACTICE, OTHER) (optional)
+- `priority`: Enum value (LOW, MEDIUM, HIGH, URGENT) (optional)
+- `dueDate`: ISO datetime (optional)
+- `courseId`: Positive integer (optional)
+- `quizId`: Positive integer (optional)
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "todo": {
+      "id": 2,
+      "title": "Study respiratory system",
+      "description": "Prepare for upcoming quiz",
+      "type": "STUDY",
+      "priority": "MEDIUM",
+      "status": "PENDING",
+      "dueDate": "2024-01-20T00:00:00.000Z",
+      "courseId": 6,
+      "createdAt": "2024-01-01T10:00:00.000Z"
+    }
+  }
+}
+```
+
+#### Update Todo
+```http
+PUT /students/todos/{id}
+Authorization: Bearer <access_token>
+Content-Type: application/json
+```
+
+**Description:** Update an existing todo item.
+
+**Authentication:** Required (Student role)
+
+**Path Parameters:**
+- `id`: Positive integer (required)
+
+**Request Body:**
+```json
+{
+  "title": "Updated todo title",
+  "priority": "HIGH",
+  "status": "COMPLETED"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "todo": {
+      "id": 2,
+      "title": "Updated todo title",
+      "priority": "HIGH",
+      "status": "COMPLETED",
+      "updatedAt": "2024-01-01T11:00:00.000Z"
+    }
+  }
+}
+```
+
+#### Delete Todo
+```http
+DELETE /students/todos/{id}
+Authorization: Bearer <access_token>
+```
+
+**Description:** Delete a todo item.
+
+**Authentication:** Required (Student role)
+
+**Path Parameters:**
+- `id`: Positive integer (required)
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Todo deleted successfully"
+}
+```
+
+#### Complete Todo
+```http
+PUT /students/todos/{id}/complete
+Authorization: Bearer <access_token>
+```
+
+**Description:** Mark a todo item as completed.
+
+**Authentication:** Required (Student role)
+
+**Path Parameters:**
+- `id`: Positive integer (required)
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "todo": {
+      "id": 2,
+      "status": "COMPLETED",
+      "completedAt": "2024-01-01T11:00:00.000Z"
+    }
+  }
+}
+```
+
+### Question Reporting
+
+#### Report Question Issue
+```http
+POST /students/questions/{id}/report
+Authorization: Bearer <access_token>
+Content-Type: application/json
+```
+
+**Description:** Report an issue with a question for quality control.
+
+**Authentication:** Required (Student role)
+
+**Path Parameters:**
+- `id`: Positive integer (required)
+
+**Request Body:**
+```json
+{
+  "reportType": "INCORRECT_ANSWER",
+  "description": "The marked correct answer seems to be wrong based on my textbook"
+}
+```
+
+**Validation Rules:**
+- `reportType`: Enum value (INCORRECT_ANSWER, UNCLEAR_QUESTION, TECHNICAL_ERROR, CONTENT_ERROR, OTHER) (required)
+- `description`: 10-1000 characters (optional)
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "report": {
+      "id": 1,
+      "questionId": 10,
+      "reportType": "INCORRECT_ANSWER",
+      "description": "The marked correct answer seems to be wrong based on my textbook",
+      "status": "PENDING",
+      "createdAt": "2024-01-01T10:00:00.000Z"
+    }
+  }
+}
+```
+
+#### Get User Reports
+```http
+GET /students/reports
+Authorization: Bearer <access_token>
+```
+
+**Description:** Get all question reports submitted by the student.
+
+**Authentication:** Required (Student role)
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "reports": [
+      {
+        "id": 1,
+        "questionId": 10,
+        "reportType": "INCORRECT_ANSWER",
+        "status": "PENDING",
+        "createdAt": "2024-01-01T10:00:00.000Z",
+        "adminResponse": null
+      }
+    ]
+  }
+}
+```
+
+#### Get Report Details
+```http
+GET /students/reports/{id}
+Authorization: Bearer <access_token>
+```
+
+**Description:** Get detailed information about a specific report.
+
+**Authentication:** Required (Student role)
+
+**Path Parameters:**
+- `id`: Positive integer (required)
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "report": {
+      "id": 1,
+      "questionId": 10,
+      "reportType": "INCORRECT_ANSWER",
+      "description": "The marked correct answer seems to be wrong",
+      "status": "RESOLVED",
+      "adminResponse": "Thank you for the report. The question has been reviewed and corrected.",
+      "createdAt": "2024-01-01T10:00:00.000Z",
+      "resolvedAt": "2024-01-02T09:00:00.000Z"
+    }
+  }
+}
+```
+
+### Performance Analytics
+
+#### Get Detailed Performance Analytics
+```http
+GET /students/dashboard/performance
+Authorization: Bearer <access_token>
+```
+
+**Description:** Get comprehensive performance analytics and insights.
+
+**Authentication:** Required (Student role)
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "overallStats": {
+      "totalSessions": 45,
+      "averageScore": 78.5,
+      "totalTimeSpent": "24h 30m",
+      "improvementRate": 12.3
+    },
+    "subjectPerformance": [
+      {
+        "subject": "Anatomy",
+        "averageScore": 82.1,
+        "sessionsCompleted": 15,
+        "timeSpent": "8h 15m",
+        "strongAreas": ["Cardiovascular System", "Respiratory System"],
+        "weakAreas": ["Nervous System"]
+      }
+    ],
+    "progressTrend": [
+      {
+        "date": "2024-01-01",
+        "averageScore": 75.2,
+        "sessionsCompleted": 3
+      }
+    ],
+    "recommendations": [
+      {
+        "type": "FOCUS_AREA",
+        "message": "Consider spending more time on Nervous System topics",
+        "priority": "HIGH"
+      }
+    ]
+  }
+}
+```
+
+#### Get Session Statistics
+```http
+GET /students/session-stats
+Authorization: Bearer <access_token>
+```
+
+**Description:** Get statistical analysis of quiz and exam sessions.
+
+**Authentication:** Required (Student role + active subscription)
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "sessionStats": {
+      "totalSessions": 45,
+      "practiceSessions": 35,
+      "examSessions": 10,
+      "averageSessionDuration": "18m 30s",
+      "completionRate": 94.2
+    },
+    "scoreDistribution": {
+      "excellent": 15,
+      "good": 20,
+      "average": 8,
+      "needsImprovement": 2
+    },
+    "timeAnalysis": {
+      "averageTimePerQuestion": "45s",
+      "fastestSession": "12m 15s",
+      "slowestSession": "35m 20s"
+    }
+  }
+}
+```
+
+### Content Access
+
+#### Get Study Packs
+```http
+GET /study-packs
+Authorization: Bearer <access_token>
+```
+
+**Description:** Get available study packs (public access, but enhanced with auth).
+
+**Authentication:** Optional (enhanced data with authentication)
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "studyPacks": [
+      {
+        "id": 1,
+        "name": "Medical Year 3 Complete",
+        "description": "Comprehensive study pack for third-year medical students",
+        "type": "YEARLY",
+        "yearNumber": "THREE",
+        "price": 299.99,
+        "isActive": true,
+        "features": [
+          "1000+ Practice Questions",
+          "50+ Mock Exams",
+          "Detailed Explanations",
+          "Progress Tracking"
+        ],
+        "userHasAccess": true
+      }
+    ]
+  }
+}
+```
+
+#### Get Study Pack Details
+```http
+GET /study-packs/{id}
+Authorization: Bearer <access_token>
+```
+
+**Description:** Get detailed information about a specific study pack.
+
+**Authentication:** Optional (enhanced data with authentication)
+
+**Path Parameters:**
+- `id`: Positive integer (required)
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "studyPack": {
+      "id": 1,
+      "name": "Medical Year 3 Complete",
+      "description": "Comprehensive study pack for third-year medical students",
+      "type": "YEARLY",
+      "yearNumber": "THREE",
+      "price": 299.99,
+      "isActive": true,
+      "totalQuestions": 1250,
+      "totalExams": 45,
+      "unites": [
+        {
+          "id": 1,
+          "name": "Basic Sciences",
+          "modules": [
+            {
+              "id": 1,
+              "name": "Anatomy",
+              "questionCount": 300
+            }
+          ]
+        }
+      ],
+      "userHasAccess": true,
+      "userProgress": {
+        "completedQuestions": 450,
+        "completedExams": 12,
+        "progressPercentage": 36.0
+      }
+    }
+  }
+}
+```
+
+#### Get Course Resources
+```http
+GET /courses/{id}/resources
+Authorization: Bearer <access_token>
+```
+
+**Description:** Get educational resources for a specific course.
+
+**Authentication:** Required (Student role + active subscription)
+
+**Path Parameters:**
+- `id`: Positive integer (required)
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "courseId": 1,
+    "courseName": "Human Anatomy",
+    "resources": [
+      {
+        "id": 1,
+        "type": "PDF",
+        "title": "Anatomy Textbook Chapter 1",
+        "description": "Introduction to human anatomy",
+        "filePath": "/media/pdfs/anatomy-ch1.pdf",
+        "isPaid": false,
+        "downloadCount": 1250
+      },
+      {
+        "id": 2,
+        "type": "VIDEO",
+        "title": "Heart Anatomy Explained",
+        "description": "Detailed explanation of heart structure",
+        "youtubeVideoId": "dQw4w9WgXcQ",
+        "isPaid": true,
+        "price": 9.99
+      }
+    ]
+  }
+}
+```
         "studyPack": {
           "id": 1,
           "name": "Third Year Medical Studies",
@@ -1844,14 +3634,14 @@ Content-Type: application/json
 #### Get All Question Reports
 
 ```http
-GET /admin/question-reports?page=1&limit=20&status=PENDING
+GET /admin/questions/reports?page=1&limit=20&status=PENDING
 Authorization: Bearer <admin_token>
 ```
 
 #### Review Question Report
 
 ```http
-PUT /admin/question-reports/{reportId}/review
+PUT /admin/questions/reports/{reportId}
 Authorization: Bearer <admin_token>
 Content-Type: application/json
 
